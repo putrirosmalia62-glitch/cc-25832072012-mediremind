@@ -1,48 +1,60 @@
 # Architecture v0.1
 
-## Deployment View (M03)
+## Deployment View (M03, sesuai implementasi)
 
 ```mermaid
-flowchart LR
-    U[User / Browser] -->|HTTP :80| SG[AWS Security Group + UFW]
-    SG --> C[Caddy :80]
-    C -->|reverse proxy| G[Gunicorn 127.0.0.1:8000]
-    G --> F[Flask Application]
+flowchart TB
+    I[Internet]
+    SG[AWS Security Group 22 dan 80]
+    F[UFW]
+    C[Caddy :80]
+    G[Gunicorn 127.0.0.1:8000]
+    A[Flask]
+
+    I --> SG --> F --> C --> G --> A
 ```
 
-## Komponen
-
-| Komponen | Fungsi |
-|---|---|
-| AWS Security Group + UFW | Firewall: hanya port 22 (SSH) dan 80 (HTTP) dibuka |
-| Caddy | Reverse proxy: menerima request publik dan meneruskannya ke Gunicorn |
-| Gunicorn | Application server, hanya listen di 127.0.0.1:8000 (loopback) |
-| Flask | Aplikasi web MediRemind |
-| systemd | Menjalankan Gunicorn sebagai service dan memulai ulang otomatis |
-
-## Rencana Evolusi
+## Planned Architecture (rencana M04–M12, belum diimplementasikan)
 
 ```mermaid
-flowchart LR
-    A[M03: HTTP via IP publik] --> B[M04: Domain + HTTPS]
-    B --> C[M05: SQLite + backup]
-    C --> D[M06: Container]
-    D --> E[M09: CI/CD]
+flowchart TB
+    U[Browser pasien dan pengawas] --> C[Caddy :80/:443]
+    C --> G[Gunicorn 127.0.0.1:8000]
+    G --> A[Flask]
+    A --> D[(SQLite WAL)]
+    T[systemd timer 1 menit] --> S[Skrip pengingat dan eskalasi]
+    S --> D
+    S --> N[Telegram Bot API / email]
+    N --> P[Pasien dan pengawas keluarga]
 ```
 
-Komponen yang direncanakan pada milestone berikutnya:
-- SQLite (mode WAL) untuk penyimpanan data (M05)
-- systemd timer untuk penjadwal pengingat
-- Telegram Bot API untuk notifikasi
+## Resource Constraints
+- AWS EC2 t3.micro, Asia Pacific (Sydney)
+- 2 vCPU (batas praktikum template: 1 vCPU)
+- RAM 909 MiB, swap 1 GB
+- 20 GB disk
 
-## Prinsip Keamanan
-- Backend hanya listen di loopback, tidak terbuka ke internet
-- SSH key-only, login root dinonaktifkan
-- Tidak ada secret di repository
-- Hanya data sintetis
+## Security Decisions
+- non-root administration (`cloudstudent`)
+- SSH key authentication
+- password SSH disabled
+- root SSH disabled
+- UFW enabled (OpenSSH dan 80/tcp)
+- AWS Security Group konsisten dengan UFW
+- backend loopback-only
 
-## Keterbatasan
-- Masih HTTP (belum HTTPS)
-- Belum ada database
-- Satu server (single point of failure)
-- Deployment manual
+## Current Limitations
+- HTTP only
+- single VPS
+- no database
+- no container
+- no CI/CD
+- AWS Free Plan berakhir 06-04-2027
+
+## Planned Evolution
+- M04 DNS + HTTPS
+- M05 persistent data (SQLite) + backup/restore
+- M06 container
+- M07 IaC
+- M09 CI/CD
+- M11–M12 pengingat, eskalasi, observability
